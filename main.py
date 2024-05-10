@@ -1,14 +1,40 @@
 import pathlib
 import cv2
+import mediapipe as mp
 import tkinter as tk
 from tkinter import filedialog
 
-# Función para iniciar la detección de caras
-def start_face_detection(source):
+# Inicialización de MediaPipe Hands
+mp_hands = mp.solutions.hands
+hands = mp_hands.Hands(static_image_mode=False,
+                       max_num_hands=2,
+                       min_detection_confidence=0.5,
+                       min_tracking_confidence=0.5)
+
+# Inicialización de MediaPipe Drawing
+mp_drawing = mp.solutions.drawing_utils
+
+# Función para iniciar la detección de caras y manos
+def start_face_and_hand_detection(source):
     camera = cv2.VideoCapture(source)
-    print("face-detection >>> Press 'Q' to quit")
+    print("Detection >>> Press 'Q' to quit")
     while True:
         _, frame = camera.read()
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame.flags.writeable = False
+        results = hands.process(frame)
+        frame.flags.writeable = True
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+        # Detección de manos
+        if results.multi_hand_landmarks:
+            for hand_landmarks in results.multi_hand_landmarks:
+                mp_drawing.draw_landmarks(
+                    frame, hand_landmarks, mp_hands.HAND_CONNECTIONS,
+                    mp_drawing.DrawingSpec(color=(121, 22, 76), thickness=2, circle_radius=4),
+                    mp_drawing.DrawingSpec(color=(250, 44, 250), thickness=2, circle_radius=2),
+                 )
+
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = clf.detectMultiScale(
             gray,
@@ -25,24 +51,25 @@ def start_face_detection(source):
         # Mostrar las coordenadas en el frame
         cv2.putText(frame, coords_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
-        cv2.imshow("face-detection", frame)
+        cv2.imshow("Detection", frame)
         if cv2.waitKey(1) == ord('q'):
             break
 
     camera.release()
     cv2.destroyAllWindows()
+    hands.close()
 
 # Función para elegir usar la cámara
 def use_camera():
     root.destroy()
-    start_face_detection(0)
+    start_face_and_hand_detection(0)
 
 # Función para elegir cargar un video
 def load_video():
     video_path = filedialog.askopenfilename()
     if video_path:
         root.destroy()
-        start_face_detection(video_path)
+        start_face_and_hand_detection(video_path)
 
 # Cargar el clasificador de Haar
 cascade_path = pathlib.Path(cv2.__file__).parent.absolute() / "data/haarcascade_frontalface_default.xml"
